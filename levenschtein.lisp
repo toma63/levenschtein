@@ -163,18 +163,11 @@
 
 (defvar partial-heap (make-instance 'heap :comparison #'compare))
 
-(defun repeated-char (string)
-  "return true if the string consists of a single repeated character"
-  (loop
-    with first-char = (char string 0)
-    for current-char across string
-    unless (char= first-char current-char) do (return nil)
-      finally (return t)))
-
 (defun trim-identical-tail (string last-n)
   "trim the last-n characters from string if they are identical"
-  (let ((trim-point (- (length string) last-n)))
-    (if (repeated-char (subseq string trim-point))
+  (let* ((trim-point (- (length string) last-n))
+	 (first-char (char string trim-point)))
+    (if (not (find-if (lambda (c) (char-not-equal c first-char)) string :start trim-point))
 	(subseq string 0 trim-point)
 	string)))
 
@@ -262,3 +255,14 @@
 	    until (eq line 'eof)
 	    do (setf sequence (concatenate 'string sequence line)))
       (values header sequence))))
+
+;; read in some sequences for test data
+(defvar ma-h)
+(defvar ma-seq)
+(multiple-value-setq (ma-h ma-seq) (rfasta "./test_data/nc2mass.fasta"))
+(defvar ca-h)
+(defvar ca-seq)
+(multiple-value-setq (ca-h ca-seq) (rfasta "./test_data/ncov2ca.fasta"))
+(defvar ref-h)
+(defvar ref-seq)
+(multiple-value-setq (ref-h ref-seq) (rfasta "./test_data/ncov2ref.fasta"))
