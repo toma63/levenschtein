@@ -1,5 +1,5 @@
 
-(load "heap.lisp")
+(load "../heap-cl/heap.lisp")
 
 (defclass partial ()
   ((moves :initform '()
