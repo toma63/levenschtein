@@ -79,6 +79,20 @@
       (1- (or (position-if-not (lambda (c) (char= c gap-char)) pat :start pat-pos) (length pat)))
       nil))
 
+;; create a new partial extended by an insertion
+(defmethod extend-insert ((part partial) txt)
+  (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
+    (make-instance 'partial
+		   :moves (cons (vector #\i (char txt txt-pos)) (copy-seq moves)) 
+		   :cost (1+ cost)
+		   :pat-pos pat-pos
+		   :txt-pos (1+ txt-pos)
+		   :max-pat max-pat
+		   :max-txt max-txt
+		   :matched matched
+		   :distance (1- distance)
+		   :delta (1+ delta))))
+
 ;; create a new partial extended by a deletion
 (defmethod extend-delete ((part partial) pat)
   (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
@@ -94,18 +108,34 @@
 		   :delta (1- delta))))
 
 ;; create a new partial extended by an insertion
-(defmethod extend-insert ((part partial) txt)
+(defmethod extend-insert-tail ((part partial) txt)
   (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
-    (make-instance 'partial
-		   :moves (cons (vector #\i (char txt txt-pos)) (copy-seq moves)) 
-		   :cost (1+ cost)
-		   :pat-pos pat-pos
-		   :txt-pos (1+ txt-pos)
-		   :max-pat max-pat
-		   :max-txt max-txt
-		   :matched matched
-		   :distance (1- distance)
-		   :delta (1+ delta))))
+    (let ((tail-length (- (length txt) txt-pos)))
+      (make-instance 'partial
+		     :moves (cons (vector #\i (subseq txt txt-pos)) (copy-seq moves)) 
+		     :cost (+ cost tail-length)
+		     :pat-pos pat-pos
+		     :txt-pos (+ txt-pos tail-length)
+		     :max-pat max-pat
+		     :max-txt max-txt
+		     :matched matched
+		     :distance (- distance tail-length)
+		     :delta (+ delta tail-length)))))
+
+;; create a new partial extended by deleting the entire tail
+(defmethod extend-delete-tail ((part partial) pat)
+  (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
+    (let ((tail-length (- (length pat) pat-pos)))
+      (make-instance 'partial
+		     :moves (cons (vector #\d (subseq pat pat-pos)) (copy-seq moves)) 
+		     :cost (+ cost tail-length)
+		     :pat-pos (+ pat-pos tail-length)
+		     :txt-pos txt-pos
+		     :max-pat max-pat
+		     :max-txt max-txt
+		     :matched matched
+		     :distance distance
+		     :delta (- delta tail-length)))))
 
 ;; create a new partial extended by a run of matches
 (defmethod extend-matches ((part partial) match-run)
@@ -207,9 +237,9 @@
 (defmethod extend ((part partial) pat txt)
   (with-slots (moves cost matched txt-pos max-txt pat-pos max-pat distance delta) part
     (cond ((> txt-pos max-txt) ; at the end of the txt, only deletions
-	   (list (extend-delete part pat)))
+	   (list (extend-delete-tail part pat)))
 	  ((> pat-pos max-pat) ; at the end of the pattern, only insertions
-	   (list (extend-insert part txt)))
+	   (list (extend-insert-tail part txt)))
 	  (t (let* ((last-pat-gap-char (gap-char-run pat pat-pos))
 		    (last-txt-gap-char (gap-char-run txt txt-pos))
 		    (match-run (gap-match-runner pat pat-pos txt txt-pos))
