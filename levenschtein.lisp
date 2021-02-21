@@ -219,21 +219,6 @@
 		     :distance (- distance gap-length)
 		     :delta delta))))
 
-;; create a list of extensions to a partial path
-(defmethod extend ((part partial) pat txt)
-  (with-slots (moves cost matched txt-pos max-txt pat-pos max-pat distance delta) part
-    (if (> txt-pos max-txt) ; at the end of the txt, only deletions
-	(list (extend-delete part pat))
-	(if (> pat-pos max-pat) ; at the end of the pattern, only insertions
-	    (list (extend-insert part txt))
-	    (let* ((match-run (gap-match-runner pat pat-pos txt txt-pos))
-		   (match-or-sub (if (> match-run 0)
-				     (extend-matches part match-run)
-				     (extend-substitute-matches part pat txt)))
-		   (insert (extend-insert-matches part pat txt))
-		   (delete (extend-delete-matches part pat txt)))
-	      (list delete insert match-or-sub))))))
-
 (defmethod extend ((part partial) pat txt)
   (with-slots (moves cost matched txt-pos max-txt pat-pos max-pat distance delta) part
     (cond ((> txt-pos max-txt) ; at the end of the txt, only deletions
@@ -254,8 +239,6 @@
 		      (list (extend-txt-gap part pat last-txt-gap-char)))
 		     (t (list delete insert match-or-sub))))))))
 					
-
-(defvar partial-heap (make-instance 'heap :comparison #'compare))
 
 (defun trim-identical-tail (string last-n)
   "trim the last-n characters from string if they are identical"
