@@ -68,6 +68,17 @@
     finally
        (return count)))
 
+(defun last-char (string)
+  "return the last character of a string"
+  (char string (1- (length string))))
+
+(defun gap-char-run (pat pat-pos &optional (gap-char #\N))
+  "Return a pointer to the last character of a run of gap-chars, or
+  nil if not pat-pos does not point to a gap-char."
+  (if (char= gap-char (char pat pat-pos))
+      (1- (or (position-if-not (lambda (c) (char= c gap-char)) pat :start pat-pos) (length pat)))
+      nil))
+
 ;; create a new partial extended by a deletion
 (defmethod extend-delete ((part partial) pat)
   (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
@@ -146,6 +157,38 @@
 	  (extend-matches new-partial match-run)
 	  new-partial))))
 
+;; extend by a pattern gap
+(defmethod extend-pat-gap ((part partial) txt last-gap-ptr)
+  (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
+    (let ((gap-length (1+ (- last-gap-ptr pat-pos))))
+      (make-instance 'partial
+		     :moves (cons (vector #\g (subseq txt txt-pos (+ txt-pos gap-length)))
+				  (copy-seq moves)) 
+		     :cost (+ cost gap-length)
+		     :pat-pos (+ pat-pos gap-length)
+		     :txt-pos (+ txt-pos gap-length)
+		     :max-pat max-pat
+		     :max-txt max-txt
+		     :matched matched
+		     :distance (- distance gap-length)
+		     :delta delta))))
+
+;; extend by a text gap
+(defmethod extend-txt-gap ((part partial) pat last-gap-ptr)
+  (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
+    (let ((gap-length (1+ (- last-gap-ptr txt-pos))))
+      (make-instance 'partial
+		     :moves (cons (vector #\g (subseq pat pat-pos (+ pat-pos gap-length)))
+				  (copy-seq moves)) 
+		     :cost (+ cost gap-length)
+		     :pat-pos (+ pat-pos gap-length)
+		     :txt-pos (+ txt-pos gap-length)
+		     :max-pat max-pat
+		     :max-txt max-txt
+		     :matched matched
+		     :distance (- distance gap-length)
+		     :delta delta))))
+
 ;; create a list of extensions to a partial path
 (defmethod extend ((part partial) pat txt)
   (with-slots (moves cost matched txt-pos max-txt pat-pos max-pat distance delta) part
@@ -160,6 +203,27 @@
 		   (insert (extend-insert-matches part pat txt))
 		   (delete (extend-delete-matches part pat txt)))
 	      (list delete insert match-or-sub))))))
+
+(defmethod extend ((part partial) pat txt)
+  (with-slots (moves cost matched txt-pos max-txt pat-pos max-pat distance delta) part
+    (cond ((> txt-pos max-txt) ; at the end of the txt, only deletions
+	   (list (extend-delete part pat)))
+	  ((> pat-pos max-pat) ; at the end of the pattern, only insertions
+	   (list (extend-insert part txt)))
+	  (t (let* ((last-pat-gap-char (gap-char-run pat pat-pos))
+		    (last-txt-gap-char (gap-char-run txt txt-pos))
+		    (match-run (gap-match-runner pat pat-pos txt txt-pos))
+		    (match-or-sub (if (> match-run 0)
+				      (extend-matches part match-run)
+				      (extend-substitute-matches part pat txt)))
+		    (insert (extend-insert-matches part pat txt))
+		    (delete (extend-delete-matches part pat txt)))
+	       (cond (last-pat-gap-char ;; always take gap-char runs
+		      (list (extend-pat-gap part txt last-pat-gap-char)))
+		     (last-txt-gap-char
+		      (list (extend-txt-gap part pat last-txt-gap-char)))
+		     (t (list delete insert match-or-sub))))))))
+					
 
 (defvar partial-heap (make-instance 'heap :comparison #'compare))
 
@@ -209,13 +273,13 @@
 	    (setf (cost partial) shift-distance)
 	    (setf (txt-pos partial) shift-distance)
 	    (setf (distance partial) (- (distance partial) shift-distance))
-	    (setf (delta partial) (- (delta partial) shift-distance))
+	    (setf (delta partial) (+ (delta partial) shift-distance))
 	    partial)
-	   ((eq ins-or-del :ins)
+	   ((eq ins-or-del :del)
 	    (setf (moves partial) '((vector #\d excess)))
 	    (setf (cost partial) shift-distance)
 	    (setf (pat-pos partial) shift-distance)
-	    (setf (delta partial) (+ (delta partial) shift-distance))
+	    (setf (delta partial) (- (delta partial) shift-distance))
 	    partial)
 	   (t (error "~S is not a valid argument (:ins or :del)" ins-or-del)))))
 
