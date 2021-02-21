@@ -253,7 +253,8 @@
   (let* ((pat-length (length pat))
 	 (txt-length (length txt))
 	 (length-diff (abs (- pat-length txt-length))))
-    (when (= pat-length txt-length) (return-from trim-longest-tail (values pat txt)))
+    (when (or (= pat-length txt-length) (< length-diff 2))
+      (return-from trim-longest-tail (values pat txt)))
     (if (< pat-length txt-length)
 	(values pat (trim-identical-tail txt length-diff))
 	(values (trim-identical-tail pat length-diff) txt))))
@@ -306,8 +307,8 @@
       (unless (or pat-align-point txt-align-point)
 	(return-from initialize-search (values trimmed-pat trimmed-txt initial-partial)))
       (if pat-align-point
-	  (values trimmed-pat trimmed-txt (shift-partial initial-partial pat-align-point trimmed-pat :ins))
-	  (values trimmed-pat trimmed-txt (shift-partial initial-partial txt-align-point trimmed-txt :del))))))
+	  (values trimmed-pat trimmed-txt (shift-partial initial-partial pat-align-point trimmed-txt :ins))
+	  (values trimmed-pat trimmed-txt (shift-partial initial-partial txt-align-point trimmed-pat :del))))))
 
 (defun lev (pat txt &optional debug)
   "compute the levenschtein or edit distance between two strings"
