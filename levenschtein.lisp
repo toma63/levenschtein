@@ -46,7 +46,7 @@
 (defgeneric compare (obj1 obj2)
   (:documentation "comparison function for use by a heap"))
 
-;; sorting compare function uses summes cost, distance, delta less match distance
+;; sorting compare function sums cost, distance, delta less match distance
 (defmethod compare ((obj1 partial) (obj2 partial))
   (with-slots ((cost1 cost) (matched1 matched) (delta1 delta) (distance1 distance)) obj1
     (with-slots ((cost2 cost) (matched2 matched) (delta2 delta) (distance2 distance)) obj2
@@ -54,19 +54,19 @@
 	    (ext-cost2 (- (+ cost2 distance2 (abs delta2)) matched2)))
 	(< ext-cost1 ext-cost2)))))
 
-(defun gap-match-runner (pat pat-ptr txt txt-ptr &optional gap-type)
+(defmacro gap-match-runner (pat pat-ptr txt txt-ptr gap-type)
   "Given two strings each with a comparison pointer, return the number
   of consecutive matching characters. if gap-type is non-nil, looks
   across ins, del, sub edits."
-  (loop
-    with pat-delta = (if (member gap-type '(:sub :del)) 1 0)
-    with txt-delta = (if (member gap-type '(:sub :ins)) 1 0)
-    for count from 0 by 1
-    for pp from (+ pat-ptr pat-delta) to (1- (length pat))
-    for tp from (+ txt-ptr txt-delta) to (1- (length txt))
-    while (char= (char pat pp) (char txt tp))
-    finally
-       (return count)))
+  (let ((pat-delta (if (member gap-type '(:sub :del)) 1 0))
+	(txt-delta (if (member gap-type '(:sub :ins)) 1 0)))
+    `(loop
+       for count from 0 by 1
+       for pp from (+ ,pat-ptr ,pat-delta) to (1- (length ,pat))
+       for tp from (+ ,txt-ptr ,txt-delta) to (1- (length ,txt))
+       while (char= (char ,pat pp) (char ,txt tp))
+       finally
+	  (return count))))
 
 (defun last-char (string)
   "return the last character of a string"
@@ -74,7 +74,7 @@
 
 (defun gap-char-run (pat pat-pos &optional (gap-char #\N))
   "Return a pointer to the last character of a run of gap-chars, or
-  nil if not pat-pos does not point to a gap-char."
+  nil if pat-pos does not point to a gap-char."
   (if (char= gap-char (char pat pat-pos))
       (1- (or (position-if-not (lambda (c) (char= c gap-char)) pat :start pat-pos) (length pat)))
       nil))
@@ -227,7 +227,7 @@
 	   (list (extend-insert-tail part txt)))
 	  (t (let* ((last-pat-gap-char (gap-char-run pat pat-pos))
 		    (last-txt-gap-char (gap-char-run txt txt-pos))
-		    (match-run (gap-match-runner pat pat-pos txt txt-pos))
+		    (match-run (gap-match-runner pat pat-pos txt txt-pos nil))
 		    (match-or-sub (if (> match-run 0)
 				      (extend-matches part match-run)
 				      (extend-substitute-matches part pat txt)))
