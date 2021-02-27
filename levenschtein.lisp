@@ -83,7 +83,7 @@
 (defmethod extend-insert ((part partial) txt)
   (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
     (make-instance 'partial
-		   :moves (cons (vector #\i (char txt txt-pos)) (copy-seq moves)) 
+		   :moves (cons (cons :i (char txt txt-pos)) (copy-seq moves)) 
 		   :cost (1+ cost)
 		   :pat-pos pat-pos
 		   :txt-pos (1+ txt-pos)
@@ -97,7 +97,7 @@
 (defmethod extend-delete ((part partial) pat)
   (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
     (make-instance 'partial
-		   :moves (cons (vector #\d (char pat pat-pos )) (copy-seq moves)) 
+		   :moves (cons (cons :d (char pat pat-pos )) (copy-seq moves)) 
 		   :cost (1+ cost)
 		   :pat-pos (1+ pat-pos)
 		   :txt-pos txt-pos
@@ -112,7 +112,7 @@
   (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
     (let ((tail-length (- (length txt) txt-pos)))
       (make-instance 'partial
-		     :moves (cons (vector #\i (subseq txt txt-pos)) (copy-seq moves)) 
+		     :moves (cons (cons :i (subseq txt txt-pos)) (copy-seq moves)) 
 		     :cost (+ cost tail-length)
 		     :pat-pos pat-pos
 		     :txt-pos (+ txt-pos tail-length)
@@ -127,7 +127,7 @@
   (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
     (let ((tail-length (- (length pat) pat-pos)))
       (make-instance 'partial
-		     :moves (cons (vector #\d (subseq pat pat-pos)) (copy-seq moves)) 
+		     :moves (cons (cons :d (subseq pat pat-pos)) (copy-seq moves)) 
 		     :cost (+ cost tail-length)
 		     :pat-pos (+ pat-pos tail-length)
 		     :txt-pos txt-pos
@@ -141,7 +141,7 @@
 (defmethod extend-matches ((part partial) match-run)
   (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
     (make-instance 'partial
-		   :moves (cons (vector #\m match-run) (copy-seq moves)) 
+		   :moves (cons (cons :m match-run) (copy-seq moves)) 
 		   :cost cost
 		   :pat-pos (+ pat-pos match-run)
 		   :txt-pos (+ txt-pos match-run)
@@ -174,7 +174,7 @@
   (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
     (let ((match-run (gap-match-runner pat pat-pos txt txt-pos :sub))
 	  (new-partial (make-instance 'partial
-				      :moves (cons (vector #\s (char txt txt-pos)) (copy-seq moves)) 
+				      :moves (cons (cons :s (char txt txt-pos)) (copy-seq moves)) 
 				      :cost (1+ cost)
 				      :pat-pos (1+ pat-pos)
 				      :txt-pos (1+ txt-pos)
@@ -192,7 +192,7 @@
   (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
     (let ((gap-length (1+ (- last-gap-ptr pat-pos))))
       (make-instance 'partial
-		     :moves (cons (vector #\g (subseq txt txt-pos (+ txt-pos gap-length)))
+		     :moves (cons (cons :g (subseq txt txt-pos (+ txt-pos gap-length)))
 				  (copy-seq moves)) 
 		     :cost (+ cost gap-length)
 		     :pat-pos (+ pat-pos gap-length)
@@ -208,7 +208,7 @@
   (with-slots (moves cost pat-pos txt-pos max-pat max-txt matched distance delta) part
     (let ((gap-length (1+ (- last-gap-ptr txt-pos))))
       (make-instance 'partial
-		     :moves (cons (vector #\g (subseq pat pat-pos (+ pat-pos gap-length)))
+		     :moves (cons (cons :g (subseq pat pat-pos (+ pat-pos gap-length)))
 				  (copy-seq moves)) 
 		     :cost (+ cost gap-length)
 		     :pat-pos (+ pat-pos gap-length)
@@ -283,14 +283,14 @@
   "adjust the initial partial if the pat and text are offset (:ins or :del)"
   (let ((excess (subseq longer-string 0 shift-distance)))
     (cond  ((eq ins-or-del :ins)
-	    (setf (moves partial) (list (vector #\i excess)))
+	    (setf (moves partial) (list (cons :i excess)))
 	    (setf (cost partial) shift-distance)
 	    (setf (txt-pos partial) shift-distance)
 	    (setf (distance partial) (- (distance partial) shift-distance))
 	    (setf (delta partial) (+ (delta partial) shift-distance))
 	    partial)
 	   ((eq ins-or-del :del)
-	    (setf (moves partial) '((vector #\d excess)))
+	    (setf (moves partial) '((cons :d excess)))
 	    (setf (cost partial) shift-distance)
 	    (setf (pat-pos partial) shift-distance)
 	    (setf (delta partial) (- (delta partial) shift-distance))
@@ -310,7 +310,7 @@
 	  (values trimmed-pat trimmed-txt (shift-partial initial-partial pat-align-point trimmed-txt :ins))
 	  (values trimmed-pat trimmed-txt (shift-partial initial-partial txt-align-point trimmed-pat :del))))))
 
-(defun lev (pat txt &optional debug)
+(defun lev (pat txt &key debug verbose)
   "compute the levenschtein or edit distance between two strings"
   (multiple-value-bind (trimmed-pat trimmed-txt initial-partial) (initialize-search pat txt)
     (let ((pq (make-instance 'heap :comparison #'compare)))
@@ -320,7 +320,7 @@
 	   (i 0 (+ i 1)))
 	  ((zerop (+ (distance best) (abs (delta best)))) best)
 	(when debug (break))
-	(format t "iteration: ~s~%best: ~s~%" i best)
+	(when verbose (format t "iteration: ~s~%best: ~s~%" i best))
 	(dolist (partial (extend best trimmed-pat trimmed-txt) nil)
 	  (shove pq partial))))))
 
