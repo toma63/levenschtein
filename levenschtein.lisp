@@ -335,12 +335,39 @@
       (values header sequence))))
 
 ;; read in some sequences for test data
-(defvar ma-h)
-(defvar ma-seq)
-(multiple-value-setq (ma-h ma-seq) (rfasta "./test_data/nc2mass.fasta"))
-(defvar ca-h)
-(defvar ca-seq)
-(multiple-value-setq (ca-h ca-seq) (rfasta "./test_data/ncov2ca.fasta"))
-(defvar ref-h)
-(defvar ref-seq)
-(multiple-value-setq (ref-h ref-seq) (rfasta "./test_data/ncov2ref.fasta"))
+(defmacro snarfasta  (header-var sequence-var filename)
+  "defvar and assign variables to the results of a parsed fast file"
+  `(progn
+     (defvar ,header-var)
+     (defvar ,sequence-var)
+     (multiple-value-setq (,header-var ,sequence-var) (rfasta ,filename))))
+
+(snarfasta ma-h ma-seq "./test_data/nc2mass.fasta")
+(snarfasta ca-h ca-seq "./test_data/ncov2ca.fasta")
+(snarfasta ref-h ref-seq "./test_data/ncov2ref.fasta")
+
+;; for benchmarking
+(defun levenshtein-distance (str1 str2)
+  "Calculates the Levenshtein distance between str1 and str2, returns an editing distance (int)."
+  (let ((n (length str1))
+        (m (length str2)))
+    ;; Check trivial cases
+    (cond ((= 0 n) (return-from levenshtein-distance m))
+          ((= 0 m) (return-from levenshtein-distance n)))
+    (let ((col (make-array (1+ m) :element-type 'integer))
+          (prev-col (make-array (1+ m) :element-type 'integer)))
+      ;; We need to store only two columns---the current one that
+      ;; is being built and the previous one
+      (dotimes (i (1+ m))
+        (setf (svref prev-col i) i))
+      ;; Loop across all chars of each string
+      (dotimes (i n)
+        (setf (svref col 0) (1+ i))
+        (dotimes (j m)
+          (setf (svref col (1+ j))
+                (min (1+ (svref col j))
+                     (1+ (svref prev-col (1+ j)))
+                     (+ (svref prev-col j)
+                        (if (char-equal (schar str1 i) (schar str2 j)) 0 1)))))
+        (rotatef col prev-col))
+      (svref prev-col m))))
